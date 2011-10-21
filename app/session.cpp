@@ -273,57 +273,55 @@ int Session::splitTopBottom(int terminalId)
         return -1;
 }
 
+/* TODO
+- When removing terminal, see if splitter can be deleted (only one terminal in splitter)
+- If terminal is resized, the size should remain the same (create new splitter in that case?)
+- Keyboard shortcut to set all terminals in current splitter to same size
+*/
 int Session::split(Terminal* terminal, Qt::Orientation orientation)
 {
     Splitter* splitter = static_cast<Splitter*>(terminal->splitter());
 
+    Splitter *targetSplitter;
+
     if (splitter->count() == 1)
-    {
-        int splitterWidth = splitter->width();
+        splitter->setOrientation(orientation);
 
-        if (splitter->orientation() != orientation)
-            splitter->setOrientation(orientation);
-
-        terminal = addTerminal(splitter);
-
-        QList<int> newSplitterSizes;
-        newSplitterSizes << (splitterWidth / 2) << (splitterWidth / 2);
-        splitter->setSizes(newSplitterSizes);
-
-        QWidget* partWidget = terminal->partWidget();
-        if (partWidget) partWidget->show();
-
-        m_activeTerminalId = terminal->id();
-    }
-    else
-    {
+    if (splitter->orientation() == orientation) {
+        targetSplitter = splitter;
+    } else {
+        // Orientation changed, we need an embedded splitter
         QList<int> splitterSizes = splitter->sizes();
-
-        Splitter* newSplitter = new Splitter(orientation, splitter);
-        connect(newSplitter, SIGNAL(destroyed()), this, SLOT(cleanup()));
-
+        targetSplitter = new Splitter(orientation, splitter);
+        connect(targetSplitter, SIGNAL(destroyed()), this, SLOT(cleanup()));
         if (splitter->indexOf(terminal->partWidget()) == 0)
-            splitter->insertWidget(0, newSplitter);
+            splitter->insertWidget(0, targetSplitter);
+        terminal->setSplitter(targetSplitter);
 
         QWidget* partWidget = terminal->partWidget();
-        if (partWidget) partWidget->setParent(newSplitter);
-
-        terminal->setSplitter(newSplitter);
-
-        terminal = addTerminal(newSplitter);
-
+        if (partWidget) partWidget->setParent(targetSplitter);
         splitter->setSizes(splitterSizes);
-        QList<int> newSplitterSizes;
-        newSplitterSizes << (splitterSizes[1] / 2) << (splitterSizes[1] / 2);
-        newSplitter->setSizes(newSplitterSizes);
-
-        newSplitter->show();
-
-        partWidget = terminal->partWidget();
-        if (partWidget) partWidget->show();
-
-        m_activeTerminalId = terminal->id();
     }
+
+    terminal = addTerminal(targetSplitter);
+
+    QList<int> splitterSizes;
+    QSize ssize(targetSplitter->size());
+    int wsize = orientation == Qt::Horizontal ? ssize.width() : ssize.height();
+    wsize /= targetSplitter->count();
+    for (int i = 0; i < targetSplitter->count(); i++)
+        splitterSizes << wsize;
+
+    //splitterSizes.last() /= 2;
+    //splitterSizes << splitterSizes.last();
+    targetSplitter->setSizes(splitterSizes);
+
+    targetSplitter->show();
+
+    QWidget *partWidget = terminal->partWidget();
+    if (partWidget) partWidget->show();
+
+    m_activeTerminalId = terminal->id();
 
     return m_activeTerminalId;
 }
