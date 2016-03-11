@@ -109,9 +109,11 @@ bool Terminal::eventFilter(QObject* /* watched */, QEvent* event)
 {
     if (event->type() == QEvent::FocusIn)
     {
-        emit activated(m_terminalId);
-
         QFocusEvent* focusEvent = static_cast<QFocusEvent*>(event);
+        if (!terminalWidget()->isVisible())
+          return false;
+
+        emit activated(m_terminalId);
 
         if (focusEvent->reason() == Qt::MouseFocusReason || focusEvent->reason() == Qt::OtherFocusReason
                 || focusEvent->reason() == Qt::BacktabFocusReason)
